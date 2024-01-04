@@ -21,6 +21,24 @@ pub fn build(b: *std.Build) void {
         },
     });
 
+    if (target.getOsTag() != .wasi) {
+        const libmodule = b.addSharedLibrary(.{
+            .name = "gbm",
+            .root_source_file = .{ .path = b.pathFromRoot("gbm-c.zig") },
+            .version = .{
+                .major = 1,
+                .minor = 0,
+                .patch = 0,
+            },
+            .target = target,
+            .optimize = optimize,
+            .link_libc = true,
+        });
+
+        libmodule.addModule("libdrm", libdrm.module("libdrm"));
+        b.installArtifact(libmodule);
+    }
+
     const exe_example = b.addExecutable(.{
         .name = "example",
         .root_source_file = .{
