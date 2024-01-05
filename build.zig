@@ -1,15 +1,36 @@
 const std = @import("std");
 
-pub fn build(b: *std.Build) void {
+pub fn build(b: *std.Build) !void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
     const no_docs = b.option(bool, "no-docs", "skip installing documentation") orelse false;
     const no_tests = b.option(bool, "no-tests", "skip generating tests") orelse false;
+    const use_mesa = b.option(bool, "use-mesa", "whether to use mesa's gbm as a fallback") orelse false;
 
     const libdrm = b.dependency("libdrm", .{
         .target = target,
         .optimize = optimize,
     });
+
+    const options = b.addOptions();
+
+    if (use_mesa) {
+        const pkgconfig = try b.findProgram(&.{"pkg-config"}, &.{});
+        options.addOption([]const u8, "gbmLibdir", blk: {
+            const tmp = b.run(&.{
+                pkgconfig,
+                "--variable=libdir",
+                "gbm",
+            });
+            break :blk b.pathJoin(&.{
+                tmp[0..(tmp.len - 1)],
+                b.fmt("{s}gbm{s}", .{
+                    std.mem.sliceTo(target.libPrefix(), 0),
+                    std.mem.sliceTo(target.dynamicLibSuffix(), 0),
+                }),
+            });
+        });
+    }
 
     const module = b.addModule("gbm", .{
         .source_file = .{ .path = b.pathFromRoot("gbm.zig") },
@@ -17,6 +38,10 @@ pub fn build(b: *std.Build) void {
             .{
                 .name = "libdrm",
                 .module = libdrm.module("libdrm"),
+            },
+            .{
+                .name = "options",
+                .module = options.createModule(),
             },
         },
     });
@@ -36,6 +61,7 @@ pub fn build(b: *std.Build) void {
         });
 
         libmodule.addModule("libdrm", libdrm.module("libdrm"));
+        libmodule.addModule("options", options.createModule());
         b.installArtifact(libmodule);
     }
 
@@ -60,6 +86,9 @@ pub fn build(b: *std.Build) void {
             .target = target,
             .optimize = optimize,
         });
+
+        unit_tests.addModule("libdrm", libdrm.module("libdrm"));
+        unit_tests.addModule("options", options.createModule());
 
         const run_unit_tests = b.addRunArtifact(unit_tests);
         step_test.dependOn(&run_unit_tests.step);

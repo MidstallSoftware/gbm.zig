@@ -31,7 +31,7 @@ export fn gbm_device_get_fd(ctx: *const gbm_device) c_int {
 
 export fn gbm_device_get_backend_name(ctx: *const gbm_device) callconv(.C) [*:0]const u8 {
     const self: *const gbm.Device = @ptrCast(@alignCast(ctx));
-    return self.backend.nameZ;
+    return self.backend.name;
 }
 
 export fn gbm_create_device(fd: c_int) ?*const gbm_device {
