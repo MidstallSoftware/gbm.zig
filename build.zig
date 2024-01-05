@@ -16,7 +16,7 @@ pub fn build(b: *std.Build) !void {
 
     if (use_mesa) {
         const pkgconfig = try b.findProgram(&.{"pkg-config"}, &.{});
-        options.addOption([]const u8, "gbmLibdir", blk: {
+        options.addOption([]const u8, "libgbm", blk: {
             const tmp = b.run(&.{
                 pkgconfig,
                 "--variable=libdir",

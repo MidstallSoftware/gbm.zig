@@ -8,7 +8,7 @@ const Surface = @import("../surface.zig");
 const Self = @This();
 
 comptime {
-    if (!@hasDecl(options, "gbmLibdir")) @compileError("Mesa was not enabled for Zig GBM.");
+    if (!@hasDecl(options, "libgbm")) @compileError("Mesa was not enabled for Zig GBM.");
 }
 
 const gbm_bo_handle = extern union {
@@ -19,16 +19,31 @@ const gbm_bo_handle = extern union {
     unsigned64: u64,
 };
 
-const gbm_device = anyopaque;
-const gbm_bo = anyopaque;
-const gbm_surface = anyopaque;
+const gbm_device = opaque {};
+const gbm_bo = opaque {};
+const gbm_surface = opaque {};
 
 const VTable = struct {
     create_device: *const fn (c_int) ?*gbm_device,
     device_destroy: *const fn (*const gbm_device) void,
     bo_create_with_modifiers2: *const fn (*const gbm_device, u32, u32, u32, ?[*]const u64, c_uint, u32) ?*gbm_bo,
     bo_import: *const fn (*const gbm_device, u32, *anyopaque, u32) ?*gbm_bo,
+    bo_map: *const fn (*const gbm_bo, u32, u32, u32, u32, u32, *u32, **anyopaque) ?*anyopaque,
+    bo_unmap: *const fn (*const gbm_bo, *anyopaque) void,
+    bo_get_width: *const fn (*const gbm_bo) u32,
+    bo_get_height: *const fn (*const gbm_bo) u32,
+    bo_get_stride: *const fn (*const gbm_bo) u32,
+    bo_get_stride_for_plane: *const fn (*const gbm_bo, c_int) u32,
+    bo_get_format: *const fn (*const gbm_bo) u32,
+    bo_get_bpp: *const fn (*const gbm_bo) u32,
+    bo_get_offset: *const fn (*const gbm_bo, c_int) u32,
     bo_get_handle: *const fn (*const gbm_bo) gbm_bo_handle,
+    bo_get_fd: *const fn (*const gbm_bo) c_int,
+    bo_get_modifier: *const fn (*const gbm_bo) u64,
+    bo_get_plane_count: *const fn (*const gbm_bo) c_int,
+    bo_get_handle_for_plane: *const fn (*const gbm_bo, c_int) gbm_bo_handle,
+    bo_get_fd_for_plane: *const fn (*const gbm_bo, c_int) c_int,
+    bo_write: *const fn (*const gbm_bo, *const anyopaque, usize) c_int,
     bo_destroy: *const fn (*const gbm_bo) void,
     surface_create_with_modifiers2: *const fn (*const gbm_device, u32, u32, u32, ?[*]const u64, c_uint, u32) ?*gbm_surface,
     surface_destroy: *const fn (*const gbm_surface) void,
@@ -53,7 +68,7 @@ pub fn create(alloc: std.mem.Allocator) !Backend {
 
     self.* = .{
         .allocator = alloc,
-        .lib = try std.DynLib.open(options.gbmLibdir),
+        .lib = try std.DynLib.open(options.libgbm),
         .vtable = undefined,
     };
     errdefer self.lib.close();
@@ -78,7 +93,24 @@ fn initBufferObject(self: *Self, device: *const Device, ptr: *const gbm_bo) !*co
     errdefer self.allocator.destroy(bo);
 
     bo.* = .{
-        .vtable = undefined,
+        .vtable = &.{
+            .map = mapBufferObject,
+            .unmap = unmapBufferObject,
+            .getWidth = getWidthBufferObject,
+            .getHeight = getHeightBufferObject,
+            .getStride = getStrideBufferObject,
+            .getStrideForPlane = getStrideForPlaneBufferObject,
+            .getFormat = getFormatBufferObject,
+            .getBpp = getBppBufferObject,
+            .getOffset = getOffsetBufferObject,
+            .getFd = getFdBufferObject,
+            .getModifier = getModifierBufferObject,
+            .getPlaneCount = getPlaneCountBufferObject,
+            .getHandleForPlane = getHandleForPlaneBufferObject,
+            .getFdForPlane = getFdForPlaneBufferObject,
+            .write = writeBufferObject,
+            .destroy = destroyBufferObject,
+        },
         .device = device,
         .handle = .{
             .unsigned32 = self.vtable.bo_get_handle(ptr).unsigned32,
@@ -168,4 +200,104 @@ fn deinit(ctx: *anyopaque) void {
     const self: *Self = @ptrCast(@alignCast(ctx));
     self.lib.close();
     self.allocator.destroy(self);
+}
+
+fn mapBufferObject(
+    ctx: *anyopaque,
+    _: BufferObject.Handle,
+    device: *const Device,
+    x: u32,
+    y: u32,
+    width: u32,
+    height: u32,
+    flags: u32,
+    stride: *u32,
+    mapData: **anyopaque,
+) anyerror!*anyopaque {
+    const self: *Self = @ptrCast(@alignCast(device.backend.ptr));
+    return self.vtable.bo_map(@ptrCast(ctx), x, y, width, height, flags, stride, mapData) orelse return switch (std.c.getErrno(-1)) {
+        .NOSYS => error.NotImplemented,
+        else => |e| std.os.unexpectedErrno(e),
+    };
+}
+
+fn unmapBufferObject(ctx: *anyopaque, _: BufferObject.Handle, device: *const Device, value: *anyopaque) void {
+    const self: *Self = @ptrCast(@alignCast(device.backend.ptr));
+    self.vtable.bo_unmap(@ptrCast(ctx), value);
+}
+
+fn getWidthBufferObject(ctx: *anyopaque, _: BufferObject.Handle, device: *const Device) u32 {
+    const self: *Self = @ptrCast(@alignCast(device.backend.ptr));
+    return self.vtable.bo_get_width(@ptrCast(ctx));
+}
+
+fn getHeightBufferObject(ctx: *anyopaque, _: BufferObject.Handle, device: *const Device) u32 {
+    const self: *Self = @ptrCast(@alignCast(device.backend.ptr));
+    return self.vtable.bo_get_height(@ptrCast(ctx));
+}
+
+fn getStrideBufferObject(ctx: *anyopaque, _: BufferObject.Handle, device: *const Device) u32 {
+    const self: *Self = @ptrCast(@alignCast(device.backend.ptr));
+    return self.vtable.bo_get_stride(@ptrCast(ctx));
+}
+
+fn getStrideForPlaneBufferObject(ctx: *anyopaque, _: BufferObject.Handle, device: *const Device, plane: usize) u32 {
+    const self: *Self = @ptrCast(@alignCast(device.backend.ptr));
+    return self.vtable.bo_get_stride_for_plane(@ptrCast(ctx), @intCast(plane));
+}
+
+fn getFormatBufferObject(ctx: *anyopaque, _: BufferObject.Handle, device: *const Device) u32 {
+    const self: *Self = @ptrCast(@alignCast(device.backend.ptr));
+    return self.vtable.bo_get_format(@ptrCast(ctx));
+}
+
+fn getBppBufferObject(ctx: *anyopaque, _: BufferObject.Handle, device: *const Device) u32 {
+    const self: *Self = @ptrCast(@alignCast(device.backend.ptr));
+    return self.vtable.bo_get_bpp(@ptrCast(ctx));
+}
+
+fn getOffsetBufferObject(ctx: *anyopaque, _: BufferObject.Handle, device: *const Device, plane: usize) u32 {
+    const self: *Self = @ptrCast(@alignCast(device.backend.ptr));
+    return self.vtable.bo_get_offset(@ptrCast(ctx), @intCast(plane));
+}
+
+fn getFdBufferObject(ctx: *anyopaque, _: BufferObject.Handle, device: *const Device) std.os.fd_t {
+    const self: *Self = @ptrCast(@alignCast(device.backend.ptr));
+    return self.vtable.bo_get_fd(@ptrCast(ctx));
+}
+
+fn getModifierBufferObject(ctx: *anyopaque, _: BufferObject.Handle, device: *const Device) u64 {
+    const self: *Self = @ptrCast(@alignCast(device.backend.ptr));
+    return self.vtable.bo_get_modifier(@ptrCast(ctx));
+}
+
+fn getPlaneCountBufferObject(ctx: *anyopaque, _: BufferObject.Handle, device: *const Device) usize {
+    const self: *Self = @ptrCast(@alignCast(device.backend.ptr));
+    return @intCast(self.vtable.bo_get_plane_count(@ptrCast(ctx)));
+}
+
+fn getHandleForPlaneBufferObject(ctx: *anyopaque, _: BufferObject.Handle, device: *const Device, plane: usize) ?BufferObject.Handle {
+    const self: *Self = @ptrCast(@alignCast(device.backend.ptr));
+    return .{
+        .unsigned32 = self.vtable.bo_get_handle_for_plane(@ptrCast(ctx), @intCast(plane)).unsigned32,
+    };
+}
+
+fn getFdForPlaneBufferObject(ctx: *anyopaque, _: BufferObject.Handle, device: *const Device, plane: usize) ?std.os.fd_t {
+    const self: *Self = @ptrCast(@alignCast(device.backend.ptr));
+    return self.vtable.bo_get_fd_for_plane(@ptrCast(ctx), @intCast(plane));
+}
+
+fn writeBufferObject(ctx: *anyopaque, _: BufferObject.Handle, device: *const Device, buff: []const u8) anyerror!void {
+    const self: *Self = @ptrCast(@alignCast(device.backend.ptr));
+    return switch (std.c.getErrno(self.vtable.bo_write(@ptrCast(ctx), @ptrCast(@alignCast(buff.ptr)), buff.len))) {
+        .SUCCESS => {},
+        .NOSYS => error.NotImplemented,
+        else => |e| std.os.unexpectedErrno(e),
+    };
+}
+
+fn destroyBufferObject(ctx: *anyopaque, _: BufferObject.Handle, device: *const Device) void {
+    const self: *Self = @ptrCast(@alignCast(device.backend.ptr));
+    self.vtable.bo_destroy(@ptrCast(ctx));
 }
