@@ -57,8 +57,8 @@ export fn gbm_bo_create(ctx: *const gbm_device, width: u32, height: u32, fmt: u3
     return gbm_bo_create_with_modifiers2(ctx, width, height, fmt, null, 0, flags);
 }
 
-export fn gbm_bo_create_with_modifiers(ctx: *const gbm_device, width: u32, height: u32, fmt: u32, modifiers: ?*u64, count: c_uint, flags: u32) ?*const gbm_bo {
-    return gbm_bo_create_with_modifiers2(ctx, width, height, fmt, modifiers, count, flags);
+export fn gbm_bo_create_with_modifiers(ctx: *const gbm_device, width: u32, height: u32, fmt: u32, modifiers: ?*u64, count: c_uint) ?*const gbm_bo {
+    return gbm_bo_create_with_modifiers2(ctx, width, height, fmt, modifiers, count, (1 << 0));
 }
 
 export fn gbm_bo_create_with_modifiers2(ctx: *const gbm_device, width: u32, height: u32, fmt: u32, modifiers: ?*u64, count: c_uint, flags: u32) ?*const gbm_bo {
@@ -208,11 +208,11 @@ export fn gbm_bo_destroy(ctx: *const gbm_bo) void {
 }
 
 export fn gbm_surface_create(ctx: *const gbm_device, width: u32, height: u32, fmt: u32, flags: u32) ?*const gbm_surface {
-    return gbm_surface_create_with_modifiers(ctx, width, height, fmt, null, 0, flags);
+    return gbm_surface_create_with_modifiers2(ctx, width, height, fmt, null, 0, flags);
 }
 
-export fn gbm_surface_create_with_modifiers(ctx: *const gbm_device, width: u32, height: u32, fmt: u32, modifiers: ?*u64, count: c_uint, flags: u32) ?*const gbm_surface {
-    return gbm_surface_create_with_modifiers2(ctx, width, height, fmt, modifiers, count, flags | (1 << 0));
+export fn gbm_surface_create_with_modifiers(ctx: *const gbm_device, width: u32, height: u32, fmt: u32, modifiers: ?*u64, count: c_uint) ?*const gbm_surface {
+    return gbm_surface_create_with_modifiers2(ctx, width, height, fmt, modifiers, count, (1 << 0));
 }
 
 export fn gbm_surface_create_with_modifiers2(ctx: *const gbm_device, width: u32, height: u32, fmt: u32, modifiers: ?*u64, count: c_uint, flags: u32) ?*const gbm_surface {
