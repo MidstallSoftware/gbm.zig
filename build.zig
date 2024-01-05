@@ -16,6 +16,19 @@ pub fn build(b: *std.Build) !void {
 
     if (use_mesa) {
         const pkgconfig = try b.findProgram(&.{"pkg-config"}, &.{});
+
+        b.getInstallStep().dependOn(&b.addInstallHeaderFile(blk: {
+            const tmp = b.run(&.{
+                pkgconfig,
+                "--variable=includedir",
+                "gbm",
+            });
+            break :blk b.pathJoin(&.{
+                tmp[0..(tmp.len - 1)],
+                "gbm.h",
+            });
+        }, "gbm.h").step);
+
         options.addOption([]const u8, "libgbm", blk: {
             const tmp = b.run(&.{
                 pkgconfig,
@@ -63,6 +76,26 @@ pub fn build(b: *std.Build) !void {
         libmodule.addModule("libdrm", libdrm.module("libdrm"));
         libmodule.addModule("options", options.createModule());
         b.installArtifact(libmodule);
+
+        const file = try b.cache_root.join(b.allocator, &[_][]const u8{"gbm.pc"});
+        const pkgconfig_file = try std.fs.cwd().createFile(file, .{});
+
+        const writer = pkgconfig_file.writer();
+        try writer.print(
+            \\prefix={s}
+            \\includedir=${{prefix}}/include
+            \\libdir=${{prefix}}/lib
+            \\
+            \\Name: gbm
+            \\URL: https://github.com/MidstallSoftware/gbm.zig
+            \\Description: Mesa gbm library (zig port)
+            \\Version: 23.1.9
+            \\Cflags: -I${{includedir}}
+            \\Libs: -L${{libdir}} -lgbm
+        , .{b.install_prefix});
+        defer pkgconfig_file.close();
+
+        b.installFile(file, "share/pkgconfig/gbm.pc");
     }
 
     const exe_example = b.addExecutable(.{

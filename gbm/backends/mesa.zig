@@ -150,6 +150,7 @@ fn createBufferObject(
 
     const ptr = self.vtable.bo_create_with_modifiers2(@ptrCast(@alignCast(device.ptr)), width, height, fmt, if (mods) |m| m.ptr else null, if (mods) |m| @intCast(m.len) else 0, flags) orelse return switch (std.c.getErrno(-1)) {
         .NOSYS => error.NotImplemented,
+        .INVAL => error.InvalidArgument,
         else => |e| std.os.unexpectedErrno(e),
     };
     errdefer self.vtable.bo_destroy(ptr);
@@ -166,6 +167,7 @@ fn importBufferObject(
 
     const ptr = self.vtable.bo_import(@ptrCast(@alignCast(device.ptr)), t, buff, usage) orelse return switch (std.c.getErrno(-1)) {
         .NOSYS => error.NotImplemented,
+        .INVAL => error.InvalidArgument,
         else => |e| std.os.unexpectedErrno(e),
     };
     errdefer self.vtable.bo_destroy(ptr);
@@ -184,6 +186,7 @@ fn createSurface(
 
     const ptr = self.vtable.surface_create_with_modifiers2(@ptrCast(@alignCast(device.ptr)), width, height, fmt, if (mods) |m| m.ptr else null, if (mods) |m| @intCast(m.len) else 0, flags) orelse return switch (std.c.getErrno(-1)) {
         .NOSYS => error.NotImplemented,
+        .INVAL => error.InvalidArgument,
         else => |e| std.os.unexpectedErrno(e),
     };
     errdefer self.vtable.surface_destroy(ptr);
@@ -301,6 +304,7 @@ fn writeBufferObject(ctx: *anyopaque, _: BufferObject.Handle, device: *const Dev
     return switch (std.c.getErrno(self.vtable.bo_write(@ptrCast(ctx), @ptrCast(@alignCast(buff.ptr)), buff.len))) {
         .SUCCESS => {},
         .NOSYS => error.NotImplemented,
+        .INVAL => error.InvalidArgument,
         else => |e| std.os.unexpectedErrno(e),
     };
 }
@@ -315,6 +319,7 @@ fn lockFrontBufferSurface(ctx: *anyopaque, device: *const Device) anyerror!*cons
     const self: *Self = @ptrCast(@alignCast(device.backend.ptr));
     const ptr = self.vtable.surface_lock_front_buffer(@ptrCast(ctx)) orelse return switch (std.c.getErrno(-1)) {
         .NOSYS => error.NotImplemented,
+        .INVAL => error.InvalidArgument,
         else => |e| std.os.unexpectedErrno(e),
     };
     errdefer self.vtable.bo_destroy(ptr);
