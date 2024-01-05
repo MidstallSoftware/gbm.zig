@@ -41,6 +41,7 @@ export fn gbm_create_device(fd: c_int) ?*const gbm_device {
     }) catch |err| blk: {
         std.c._errno().* = @intFromEnum(switch (err) {
             error.OutOfMemory => std.c.E.NOMEM,
+            error.NotImplemented => std.c.E.NOSYS,
             else => std.c.E.IO,
         });
         break :blk null;
@@ -65,6 +66,7 @@ export fn gbm_bo_create_with_modifiers2(ctx: *const gbm_device, width: u32, heig
     return @ptrCast(@alignCast(self.createBufferObject(width, height, fmt, flags, if (modifiers) |m| @as([*]const u64, @ptrCast(@alignCast(m)))[0..count] else null) catch |err| blk: {
         std.c._errno().* = @intFromEnum(switch (err) {
             error.OutOfMemory => std.c.E.NOMEM,
+            error.NotImplemented => std.c.E.NOSYS,
             else => std.c.E.IO,
         });
         break :blk null;
@@ -76,6 +78,7 @@ export fn gbm_bo_map(ctx: *const gbm_bo, x: u32, y: u32, width: u32, height: u32
     return self.map(x, y, width, height, flags, stride, data) catch |err| blk: {
         std.c._errno().* = @intFromEnum(switch (err) {
             error.OutOfMemory => std.c.E.NOMEM,
+            error.NotImplemented => std.c.E.NOSYS,
             else => std.c.E.IO,
         });
         break :blk null;
@@ -166,6 +169,7 @@ export fn gbm_bo_write(ctx: *const gbm_bo, ptr: *const anyopaque, count: usize) 
     self.write(@as([*]const u8, @ptrCast(@alignCast(ptr)))[0..count]) catch |err| {
         std.c._errno().* = @intFromEnum(switch (err) {
             error.OutOfMemory => std.c.E.NOMEM,
+            error.NotImplemented => std.c.E.NOSYS,
             else => std.c.E.IO,
         });
         return -1;
@@ -216,6 +220,7 @@ export fn gbm_surface_create_with_modifiers2(ctx: *const gbm_device, width: u32,
     return @ptrCast(@alignCast(self.createSurface(width, height, fmt, flags, if (modifiers) |m| @as([*]const u64, @ptrCast(@alignCast(m)))[0..count] else null) catch |err| blk: {
         std.c._errno().* = @intFromEnum(switch (err) {
             error.OutOfMemory => std.c.E.NOMEM,
+            error.NotImplemented => std.c.E.NOSYS,
             else => std.c.E.IO,
         });
         break :blk null;
@@ -227,6 +232,7 @@ export fn gbm_surface_lock_front_buffer(ctx: *const gbm_surface) ?*const gbm_bo 
     return @ptrCast(@alignCast(self.lockFrontBuffer() catch |err| blk: {
         std.c._errno().* = @intFromEnum(switch (err) {
             error.OutOfMemory => std.c.E.NOMEM,
+            error.NotImplemented => std.c.E.NOSYS,
             else => std.c.E.IO,
         });
         break :blk null;

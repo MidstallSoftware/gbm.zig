@@ -19,9 +19,9 @@ const gbm_bo_handle = extern union {
     unsigned64: u64,
 };
 
-const gbm_device = struct {};
-const gbm_bo = struct {};
-const gbm_surface = struct {};
+const gbm_device = anyopaque;
+const gbm_bo = anyopaque;
+const gbm_surface = anyopaque;
 
 const VTable = struct {
     create_device: *const fn (c_int) ?*gbm_device,
@@ -97,7 +97,10 @@ fn isSupported(ctx: *anyopaque, node: *const libdrm.Node) bool {
 
 fn initDevice(device: *Device) anyerror!void {
     const self: *Self = @ptrCast(@alignCast(device.backend.ptr));
-    device.ptr = @ptrCast(self.vtable.create_device(device.node.fd) orelse return error.UnknownError);
+    device.ptr = @ptrCast(self.vtable.create_device(device.node.fd) orelse return switch (std.c.getErrno(-1)) {
+        .NOSYS => error.NotImplemented,
+        else => |e| std.os.unexpectedErrno(e),
+    });
 }
 
 fn createBufferObject(
@@ -110,7 +113,10 @@ fn createBufferObject(
 ) anyerror!*const BufferObject {
     const self: *Self = @ptrCast(@alignCast(device.backend.ptr));
 
-    const ptr = self.vtable.bo_create_with_modifiers2(@ptrCast(@alignCast(device.ptr)), width, height, fmt, if (mods) |m| m.ptr else null, if (mods) |m| @intCast(m.len) else 0, flags) orelse return error.UnknownError;
+    const ptr = self.vtable.bo_create_with_modifiers2(@ptrCast(@alignCast(device.ptr)), width, height, fmt, if (mods) |m| m.ptr else null, if (mods) |m| @intCast(m.len) else 0, flags) orelse return switch (std.c.getErrno(-1)) {
+        .NOSYS => error.NotImplemented,
+        else => |e| std.os.unexpectedErrno(e),
+    };
     errdefer self.vtable.bo_destroy(ptr);
     return self.initBufferObject(device, ptr);
 }
@@ -123,7 +129,10 @@ fn importBufferObject(
 ) !*const BufferObject {
     const self: *Self = @ptrCast(@alignCast(device.backend.ptr));
 
-    const ptr = self.vtable.bo_import(@ptrCast(@alignCast(device.ptr)), t, buff, usage) orelse return error.UnknownError;
+    const ptr = self.vtable.bo_import(@ptrCast(@alignCast(device.ptr)), t, buff, usage) orelse return switch (std.c.getErrno(-1)) {
+        .NOSYS => error.NotImplemented,
+        else => |e| std.os.unexpectedErrno(e),
+    };
     errdefer self.vtable.bo_destroy(ptr);
     return self.initBufferObject(device, ptr);
 }
@@ -138,7 +147,10 @@ fn createSurface(
 ) !*const Surface {
     const self: *Self = @ptrCast(@alignCast(device.backend.ptr));
 
-    const ptr = self.vtable.surface_create_with_modifiers2(@ptrCast(@alignCast(device.ptr)), width, height, fmt, if (mods) |m| m.ptr else null, if (mods) |m| @intCast(m.len) else 0, flags) orelse return error.UnknownError;
+    const ptr = self.vtable.surface_create_with_modifiers2(@ptrCast(@alignCast(device.ptr)), width, height, fmt, if (mods) |m| m.ptr else null, if (mods) |m| @intCast(m.len) else 0, flags) orelse return switch (std.c.getErrno(-1)) {
+        .NOSYS => error.NotImplemented,
+        else => |e| std.os.unexpectedErrno(e),
+    };
     errdefer self.vtable.surface_destroy(ptr);
 
     const surf = try self.allocator.create(Surface);
