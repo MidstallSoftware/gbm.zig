@@ -46,6 +46,9 @@ const VTable = struct {
     bo_write: *const fn (*const gbm_bo, *const anyopaque, usize) c_int,
     bo_destroy: *const fn (*const gbm_bo) void,
     surface_create_with_modifiers2: *const fn (*const gbm_device, u32, u32, u32, ?[*]const u64, c_uint, u32) ?*gbm_surface,
+    surface_lock_front_buffer: *const fn (*const gbm_device) ?*gbm_bo,
+    surface_release_buffer: *const fn (*const gbm_surface, *const gbm_bo) void,
+    surface_has_free_buffers: *const fn (*const gbm_surface) c_int,
     surface_destroy: *const fn (*const gbm_surface) void,
 
     pub fn init(lib: *std.DynLib) VTable {
@@ -189,7 +192,12 @@ fn createSurface(
     errdefer self.allocator.destroy(surf);
 
     surf.* = .{
-        .vtable = undefined,
+        .vtable = &.{
+            .lockFrontBuffer = lockFrontBufferSurface,
+            .releaseBuffer = releaseBufferSurface,
+            .hasFreeBuffers = hasFreeBuffersSurface,
+            .destroy = destroySurface,
+        },
         .device = device,
         .ptr = ptr,
     };
@@ -300,4 +308,31 @@ fn writeBufferObject(ctx: *anyopaque, _: BufferObject.Handle, device: *const Dev
 fn destroyBufferObject(ctx: *anyopaque, _: BufferObject.Handle, device: *const Device) void {
     const self: *Self = @ptrCast(@alignCast(device.backend.ptr));
     self.vtable.bo_destroy(@ptrCast(ctx));
+    self.allocator.destroy(self);
+}
+
+fn lockFrontBufferSurface(ctx: *anyopaque, device: *const Device) anyerror!*const BufferObject {
+    const self: *Self = @ptrCast(@alignCast(device.backend.ptr));
+    const ptr = self.vtable.surface_lock_front_buffer(@ptrCast(ctx)) orelse return switch (std.c.getErrno(-1)) {
+        .NOSYS => error.NotImplemented,
+        else => |e| std.os.unexpectedErrno(e),
+    };
+    errdefer self.vtable.bo_destroy(ptr);
+    return try self.initBufferObject(device, ptr);
+}
+
+fn releaseBufferSurface(ctx: *anyopaque, device: *const Device, bo: *const BufferObject) void {
+    const self: *Self = @ptrCast(@alignCast(device.backend.ptr));
+    self.vtable.surface_release_buffer(@ptrCast(ctx), @ptrCast(bo.ptr));
+}
+
+fn hasFreeBuffersSurface(ctx: *anyopaque, device: *const Device) bool {
+    const self: *Self = @ptrCast(@alignCast(device.backend.ptr));
+    return self.vtable.surface_has_free_buffers(@ptrCast(ctx)) == 1;
+}
+
+fn destroySurface(ctx: *anyopaque, device: *const Device) void {
+    const self: *Self = @ptrCast(@alignCast(device.backend.ptr));
+    self.vtable.surface_destroy(@ptrCast(ctx));
+    self.allocator.destroy(self);
 }
