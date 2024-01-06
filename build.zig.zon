@@ -4,8 +4,8 @@
   .paths = .{"."},
   .dependencies = .{
     .libdrm = .{
-      .url = "https://github.com/MidstallSoftware/libdrm.zig/archive/49894df22812e6fa4470f0dfcb2fa070a1aa2008.tar.gz",
-      .hash = "1220c4b8a26e926c426f4052c976d5d66b6159edaf2c4330dacb999ede0499867ef1",
+      .url = "https://github.com/MidstallSoftware/libdrm.zig/archive/c7461292dd9657d6b903cefe3cab8726f629fce6.tar.gz",
+      .hash = "1220a4a92c6b34b498eb6fc59d7219ea766af83175c3325850222af3cbd6915435df",
     },
   },
 }

@@ -38,16 +38,16 @@ pub fn build(b: *std.Build) !void {
             break :blk b.pathJoin(&.{
                 tmp[0..(tmp.len - 1)],
                 b.fmt("{s}gbm{s}", .{
-                    std.mem.sliceTo(target.libPrefix(), 0),
-                    std.mem.sliceTo(target.dynamicLibSuffix(), 0),
+                    std.mem.sliceTo(target.result.libPrefix(), 0),
+                    std.mem.sliceTo(target.result.dynamicLibSuffix(), 0),
                 }),
             });
         });
     }
 
     const module = b.addModule("gbm", .{
-        .source_file = .{ .path = b.pathFromRoot("gbm.zig") },
-        .dependencies = &.{
+        .root_source_file = .{ .path = b.pathFromRoot("gbm.zig") },
+        .imports = &.{
             .{
                 .name = "libdrm",
                 .module = libdrm.module("libdrm"),
@@ -59,7 +59,7 @@ pub fn build(b: *std.Build) !void {
         },
     });
 
-    if (target.getOsTag() != .wasi) {
+    if (target.result.os.tag != .wasi) {
         const libmodule = b.addSharedLibrary(.{
             .name = "gbm",
             .root_source_file = .{ .path = b.pathFromRoot("gbm-c.zig") },
@@ -73,8 +73,8 @@ pub fn build(b: *std.Build) !void {
             .link_libc = true,
         });
 
-        libmodule.addModule("libdrm", libdrm.module("libdrm"));
-        libmodule.addModule("options", options.createModule());
+        libmodule.root_module.addImport("libdrm", libdrm.module("libdrm"));
+        libmodule.root_module.addImport("options", options.createModule());
         b.installArtifact(libmodule);
 
         const file = try b.cache_root.join(b.allocator, &[_][]const u8{"gbm.pc"});
@@ -106,7 +106,7 @@ pub fn build(b: *std.Build) !void {
         .target = target,
         .optimize = optimize,
     });
-    exe_example.addModule("gbm", module);
+    exe_example.root_module.addImport("gbm", module);
     b.installArtifact(exe_example);
 
     if (!no_tests) {
@@ -120,8 +120,8 @@ pub fn build(b: *std.Build) !void {
             .optimize = optimize,
         });
 
-        unit_tests.addModule("libdrm", libdrm.module("libdrm"));
-        unit_tests.addModule("options", options.createModule());
+        unit_tests.root_module.addImport("libdrm", libdrm.module("libdrm"));
+        unit_tests.root_module.addImport("options", options.createModule());
 
         const run_unit_tests = b.addRunArtifact(unit_tests);
         step_test.dependOn(&run_unit_tests.step);
